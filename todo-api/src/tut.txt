@@ -1,0 +1,48 @@
+use actix_web::{web, get, App, HttpResponse, HttpServer, Responder};
+
+#[get("/")]
+async fn home_page() -> impl Responder {
+    HttpResponse::Ok().body("This Home Route For Todo API")
+}
+
+#[get("/about")]
+async fn about_page() -> impl Responder {
+    HttpResponse::Ok().body("<h1>This About Route For Todo API</h1>")
+}
+
+async fn home() -> impl Responder{
+    "Home Page"
+}
+async fn about() -> impl Responder{
+    "About Page"
+}
+
+async fn random() -> impl Responder{
+    "Random as Anything"
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    HttpServer::new(|| {
+        App::new()
+        // * serving following functions, when the attached url is called.
+        // .service(home_page)
+        // .service(about_page)
+
+        // * following code shows scope, different scopes can be created. 
+        // .service(
+        //     web::scope("/app")
+        //     .route("/home", web::get().to(home)) //* use /app/home for this, home fx() used here does not have routes attached to them */
+        //     .route("/about", web::get().to(about))
+        // )
+        // .service(
+        //     web::scope("")
+        //     .route("/anything", web::get().to(random))
+        // )
+
+        
+    })
+    .bind(("127.0.0.1", 1050))?
+    .run()
+    .await
+}
