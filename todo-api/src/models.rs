@@ -12,3 +12,11 @@ pub struct User {
     pub username: String,
     pub email: String,
 }
+
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct Task {
+    pub title : String,
+    pub content : String,
+    pub user_name : String
+}

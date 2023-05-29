@@ -1,11 +1,11 @@
 
 
 mod models;
-#[cfg(test)]
-mod test;
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer};
 use crate::models::User;
+use crate::models::Task;
+
 use mongodb::{bson::doc, options::IndexOptions, Client, Collection, IndexModel};
 
 const DB_NAME: &str = "actix-todo";
@@ -13,7 +13,7 @@ const COLL_NAME: &str = "users";
 
 /// Adds a new user to the "users" collection in the database.
 #[post("/add_user")]
-async fn add_user(client: web::Data<Client>, form: web::Form<User>) -> HttpResponse {
+async fn add_user(client: web::Data<Client>, form: web::Json<User>) -> HttpResponse {
     let collection = client.database(DB_NAME).collection(COLL_NAME);
     let result = collection.insert_one(form.into_inner(), None).await;
     match result {
@@ -54,18 +54,37 @@ async fn create_username_index(client: &Client) {
         .expect("creating an index should succeed");
 }
 
+// to-do-api
+#[post("/add_task")]
+async fn add_task(client:web::Data<Client>, taskData:web::Json<Task>) -> HttpResponse{
+    let collection = client.database(DB_NAME).collection("tasks");
+    let result = collection.insert_one(taskData.into_inner(), None).await;
+    // format!("{}", result);
+    match result {
+        Ok(_) => HttpResponse::Ok().body("Task Added"),
+        Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+    }
+}
+
+#[get("/get_all_task")]
+async fn get_tasks() -> HttpResponse{
+
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let uri = std::env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017".into());
 
     let client = Client::with_uri_str(uri).await.expect("failed to connect");
-    create_username_index(&client).await;
+    // create_username_index(&client).await;
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(client.clone()))
             .service(add_user)
             .service(get_user)
+            .service(add_task)
+            .service(get_tasks)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
