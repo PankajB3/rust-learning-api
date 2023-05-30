@@ -3,13 +3,17 @@
 mod models;
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer};
+use mongodb::bson::Document;
 use crate::models::User;
 use crate::models::Task;
+// use futures_util::stream::stream::StreamExt;
+use futures::stream::{StreamExt, TryStreamExt};
 
 use mongodb::{bson::doc, options::IndexOptions, Client, Collection, IndexModel};
 
 const DB_NAME: &str = "actix-todo";
 const COLL_NAME: &str = "users";
+const TASK_COLL_NAME :&str = "tasks";
 
 /// Adds a new user to the "users" collection in the database.
 #[post("/add_user")]
@@ -66,9 +70,22 @@ async fn add_task(client:web::Data<Client>, taskData:web::Json<Task>) -> HttpRes
     }
 }
 
-#[get("/get_all_task")]
-async fn get_tasks() -> HttpResponse{
-
+#[get("/task")]
+async fn get_all_task(client:web::Data<Client>) -> HttpResponse {
+    // let email = path.into_inner();
+    let collection:Collection<Task> = client.database(DB_NAME).collection("tasks");
+    let result = collection.find(Document::new(), None).await;
+    // format!("{}", result);
+    let mut resp:Vec<Task> = Vec::new();
+    match result {
+        Ok(mut result) => { 
+            while let Some(data) = result.next().await{
+                resp.push(data.unwrap());
+            }
+            HttpResponse::Ok().json(resp)
+        },
+        Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+    }
 }
 
 #[actix_web::main]
@@ -84,7 +101,7 @@ async fn main() -> std::io::Result<()> {
             .service(add_user)
             .service(get_user)
             .service(add_task)
-            .service(get_tasks)
+            .service(get_all_task)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
