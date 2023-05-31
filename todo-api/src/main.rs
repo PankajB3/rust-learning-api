@@ -114,17 +114,27 @@ async fn update_task(client:web::Data<Client>, path:web::Path<String>, updateBod
     let bson_document = match Document::from_reader(title.as_bytes()) {
         Ok(doc) => doc,
         Err(err) => {
-            err
+            Document::new()
             // eprintln!("Failed to parse JSON: {}", err);
         }
     };
 
     let content_bson = match Document::from_reader(updateBody.content.as_bytes()){
         Ok(content) => content,
-        Err(err) => err,
+        Err(err) => Document::new(),
     };
+
     let result = collection.find_one_and_update(bson_document, content_bson, None).await;
-    HttpResponse::Ok().body("")
+    match result {
+        Ok(data) => {
+           return match data {
+                Some(data) => HttpResponse::Ok().json(data),
+                None => HttpResponse::InternalServerError().body("err".to_string()),
+            }
+            // None()
+        },
+        Err(err) => HttpResponse::InternalServerError().body(err.to_string())
+    }
 }
 
 
@@ -142,6 +152,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_user)
             .service(add_task)
             .service(get_all_task)
+            .service(update_task)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
