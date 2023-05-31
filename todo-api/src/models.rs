@@ -20,3 +20,9 @@ pub struct Task {
     pub content : String,
     pub user_name : String
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct updateBody{
+    pub content : String,
+    pub user_name:String
+}

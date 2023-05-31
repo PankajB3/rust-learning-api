@@ -2,12 +2,14 @@
 
 mod models;
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer};
+use actix_web::{get, post, put, delete, web, App, HttpResponse, HttpServer};
 use mongodb::bson::Document;
 use crate::models::User;
 use crate::models::Task;
+use crate::models::updateBody;
 // use futures_util::stream::stream::StreamExt;
 use futures::stream::{StreamExt, TryStreamExt};
+
 
 use mongodb::{bson::doc, options::IndexOptions, Client, Collection, IndexModel};
 
@@ -61,7 +63,23 @@ async fn create_username_index(client: &Client) {
 // to-do-api
 #[post("/add_task")]
 async fn add_task(client:web::Data<Client>, taskData:web::Json<Task>) -> HttpResponse{
-    let collection = client.database(DB_NAME).collection("tasks");
+    let collection:mongodb::Collection<Task> = client.database(DB_NAME).collection("tasks");
+    
+    //todo checking if this title exists
+    // let allTasks = collection.find(Document::new(),None).await;
+    // match allTasks{
+    //     Ok(mut result) => {
+    //         while let Some(data) =  result.next().await{
+    //             if(data.unwrap().title == taskData.title){
+    //                 return HttpResponse::InternalServerError().body("err".to_string())
+    //             }else{
+    //                 collection.insert_one(taskData.into_inner(), None).await;
+    //             }
+    //         }
+    //     },
+    //     Err(err) => HttpResponse::InternalServerError().body(err.to_string()), 
+    // }
+
     let result = collection.insert_one(taskData.into_inner(), None).await;
     // format!("{}", result);
     match result {
@@ -87,6 +105,28 @@ async fn get_all_task(client:web::Data<Client>) -> HttpResponse {
         Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
     }
 }
+
+
+#[put("/task/{title}")]
+async fn update_task(client:web::Data<Client>, path:web::Path<String>, updateBody:web::Json<updateBody>) -> HttpResponse {
+    let title = path.into_inner();
+    let collection:Collection<Task> = client.database(DB_NAME).collection("tasks");
+    let bson_document = match Document::from_reader(title.as_bytes()) {
+        Ok(doc) => doc,
+        Err(err) => {
+            err
+            // eprintln!("Failed to parse JSON: {}", err);
+        }
+    };
+
+    let content_bson = match Document::from_reader(updateBody.content.as_bytes()){
+        Ok(content) => content,
+        Err(err) => err,
+    };
+    let result = collection.find_one_and_update(bson_document, content_bson, None).await;
+    HttpResponse::Ok().body("")
+}
+
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
