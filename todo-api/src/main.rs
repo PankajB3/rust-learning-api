@@ -7,11 +7,12 @@ use mongodb::bson::Document;
 use crate::models::User;
 use crate::models::Task;
 use crate::models::updateBody;
-// use futures_util::stream::stream::StreamExt;
 use futures::stream::{StreamExt, TryStreamExt};
 
 
 use mongodb::{bson::doc, options::IndexOptions, Client, Collection, IndexModel};
+use mongodb::options::FindOneAndUpdateOptions;
+use mongodb::options::ReturnDocument;
 
 const DB_NAME: &str = "actix-todo";
 const COLL_NAME: &str = "users";
@@ -110,25 +111,23 @@ async fn get_all_task(client:web::Data<Client>) -> HttpResponse {
 #[put("/task/{title}")]
 async fn update_task(client:web::Data<Client>, path:web::Path<String>, updateBody:web::Json<updateBody>) -> HttpResponse {
     let title = path.into_inner();
+    print!("{}", title);
+    print!("\n\nupdate_task\n\n");
+    print!("{:?}", updateBody.content);
     let collection:Collection<Task> = client.database(DB_NAME).collection("tasks");
-    let bson_document = match Document::from_reader(title.as_bytes()) {
-        Ok(doc) => doc,
-        Err(err) => {
-            Document::new()
-            // eprintln!("Failed to parse JSON: {}", err);
-        }
-    };
 
-    let content_bson = match Document::from_reader(updateBody.content.as_bytes()){
-        Ok(content) => content,
-        Err(err) => Document::new(),
-    };
+    let filter = doc! {"title":title};
+    let content = doc! {"$set":{"content":&updateBody.content}};
+    
+    let mut builder = FindOneAndUpdateOptions::default();
+    builder.return_document = Some(ReturnDocument::After);
 
-    let result = collection.find_one_and_update(bson_document, content_bson, None).await;
+    let result = collection.find_one_and_update(filter, content, Some(builder)).await;
+    
     match result {
         Ok(data) => {
            return match data {
-                Some(data) => HttpResponse::Ok().json(data),
+                Some(data) =>{ HttpResponse::Ok().json(data) },
                 None => HttpResponse::InternalServerError().body("err".to_string()),
             }
             // None()
@@ -137,6 +136,22 @@ async fn update_task(client:web::Data<Client>, path:web::Path<String>, updateBod
     }
 }
 
+#[delete("/task/{title}")]
+async fn delete_task(client:web::Data<Client>, path:web::Path<String>) -> HttpResponse{
+    let title = path.into_inner();
+    let collection:Collection<Task> = client.database(DB_NAME).collection("tasks");
+    let filter = doc! {"title":title};
+    let result = collection.find_one_and_delete(filter, None).await;
+    match result {
+        Ok(data) => {
+            return match data {
+                Some(data) => HttpResponse::Ok().json("Task Deleted"),
+                None => HttpResponse::Ok().json("No Data Received".to_string()),
+            }
+        },
+        Err(err) => HttpResponse::InternalServerError().body(err.to_string())
+    }
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -153,6 +168,7 @@ async fn main() -> std::io::Result<()> {
             .service(add_task)
             .service(get_all_task)
             .service(update_task)
+            .service(delete_task)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
